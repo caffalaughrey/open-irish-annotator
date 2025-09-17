@@ -1,5 +1,11 @@
 .PHONY: help setup download splits build-tagset train eval export parity fmt lint rust-build rust-test
 PY ?= python3
+export PYTHONPATH := src
+
+# Prefer venv python if available
+ifneq (,$(wildcard .venv/bin/python))
+  PY := .venv/bin/python
+endif
 
 help:
 	@echo "Targets: setup, download, splits, build-tagset, train, eval, export, parity, fmt, lint, rust-build, rust-test"
@@ -18,13 +24,13 @@ build-tagset:
 	$(PY) scripts/build_tagset.py
 
 train:
-	$(PY) -m src.gaeilge_morph.training.train || echo "Training stub not implemented yet"
+	$(PY) -m gaeilge_morph.training.train || echo "Training stub not implemented yet"
 
 eval:
-	$(PY) -m src.gaeilge_morph.eval.evaluate || echo "Eval stub not implemented yet"
+	$(PY) -m gaeilge_morph.eval.evaluate || echo "Eval stub not implemented yet"
 
 export:
-	$(PY) -m src.gaeilge_morph.export.export_onnx || echo "Export stub not implemented yet"
+	$(PY) -m gaeilge_morph.export.export_onnx || echo "Export stub not implemented yet"
 
 parity:
 	$(PY) scripts/onnx_parity.py
