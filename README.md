@@ -1,7 +1,7 @@
 Open Irish Morphological Analyzer (UD-based)
 ===========================================
 
-This repo hosts training code for an Irish (Gaeilge) morphology model and a Rust runtime that loads a compact ONNX model for token-level analysis: UD UPOS+FEATS and lemmas.
+This project trains an Irish (Gaeilge) morphology model and ships a language-agnostic ONNX artifact (tags + lemmas) plus a small Rust CLI/runtime for easy use.
 
 Quickstart
 ----------
@@ -32,22 +32,19 @@ make export
 make parity
 ```
 
-Containers (optional)
----------------------
+Artifacts and resources
+-----------------------
 
-Build and open a devcontainer:
-
-```bash
-docker build -t open-irish-annotator .
-docker run -it --rm -v "$PWD":/workspace -w /workspace open-irish-annotator bash
-# inside container
-make setup
-```
+- Model: `artifacts/onnx/model.onnx`
+- Resources (built via step 2): `data/processed/tagset.json`, `word_vocab.json`, `char_vocab.json`, optional `lemma_lexicon.json`
 
 Rust runtime
 ------------
 
-The Rust crate under `examples/rust/morphology_runtime` will load the ONNX model and associated resources and expose a simple API. For now it contains a stub implementation that compiles without ONNX; the ONNX dependency will be added once the model export stabilizes.
+Rust runtime / CLI
+------------------
+
+The Rust crate under `examples/rust/morphology_runtime` loads the ONNX model and resources, and exposes a simple API plus a CLI.
 
 ONNX I/O
 --------
@@ -63,6 +60,11 @@ cargo run --manifest-path examples/rust/morphology_runtime/Cargo.toml --features
 
 # via stdin (one sentence per line, space tokenized)
 echo "Is maidin bhreá í" | cargo run --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference --bin analyze --
+
+Flags:
+
+- `--model <path>` (default fallback: `artifacts/onnx/model.onnx`)
+- `--resources <dir>` (default fallback: `data/processed`)
 ```
 
 Use from another Rust project

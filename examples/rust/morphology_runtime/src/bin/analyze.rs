@@ -1,4 +1,5 @@
 use morphology_runtime::api::MorphologyRuntime;
+use std::path::Path;
 
 fn main() {
     let crate_dir = env!("CARGO_MANIFEST_DIR");
@@ -11,6 +12,20 @@ fn main() {
         if args[i] == "--model" && i + 1 < args.len() { model_path = args[i+1].clone(); args.drain(i..=i+1); continue; }
         if args[i] == "--resources" && i + 1 < args.len() { res_dir = args[i+1].clone(); args.drain(i..=i+1); continue; }
         i += 1;
+    }
+
+    // Fallback search to de-duplicate resources
+    if !Path::new(&model_path).exists() {
+        let alt = "artifacts/onnx/model.onnx";
+        if Path::new(alt).exists() {
+            model_path = alt.to_string();
+        }
+    }
+    if !Path::new(&format!("{}/tagset.json", res_dir)).exists() {
+        let alt = "data/processed";
+        if Path::new(&format!("{}/tagset.json", alt)).exists() {
+            res_dir = alt.to_string();
+        }
     }
 
     let runtime = MorphologyRuntime::new_from_resources(&model_path, &res_dir)
