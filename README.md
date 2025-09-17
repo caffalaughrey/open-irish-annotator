@@ -40,6 +40,13 @@ Rust runtime
 
 The Rust crate under `rust/morphology_runtime` will load the ONNX model and associated resources and expose a simple API. For now it contains a stub implementation that compiles without ONNX; the ONNX dependency will be added once the model export stabilizes.
 
+ONNX I/O
+--------
+
+- Input: `word_ids` [batch, tokens] int64; `char_ids` [batch, tokens, chars] int64
+- Output: `tag_logits` [batch, tokens, num_tags]; `lemma_logits` [batch, tokens, lemma_len, num_chars]
+
+
 License
 -------
 
