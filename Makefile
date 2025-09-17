@@ -1,4 +1,4 @@
-.PHONY: help setup download splits build-tagset train eval export parity fmt lint rust-build rust-test
+.PHONY: help setup download splits build-tagset train eval export parity fmt lint rust-build rust-test release
 PY ?= python3
 export PYTHONPATH := src
 
@@ -50,6 +50,9 @@ rust-build:
 
 rust-test:
 	cargo test --manifest-path rust/morphology_runtime/Cargo.toml
+
+release:
+	bash scripts/package_release.sh $(VERSION)
 
 
 # Docker helpers

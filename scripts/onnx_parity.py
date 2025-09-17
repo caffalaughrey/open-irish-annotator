@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from __future__ import annotations
 
+import argparse
 import json
 from pathlib import Path
 
@@ -12,6 +13,10 @@ from gaeilge_morph.models.model import GaelicMorphModel
 
 
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tag-thresh", type=float, default=0.95)
+    ap.add_argument("--lemma-thresh", type=float, default=0.80)
+    args = ap.parse_args()
     processed = Path("data/processed")
     tag2id = json.loads((processed / "tagset.json").read_text(encoding="utf-8"))
     word2id = json.loads((processed / "word_vocab.json").read_text(encoding="utf-8"))
@@ -65,6 +70,9 @@ def main() -> None:
     tag_ratio = tag_equal / max(total_tokens, 1)
     lemma_ratio = lemma_equal / max(total_tokens, 1)
     print(f"parity(argmax): tag={tag_ratio:.3f} lemma_token_exact={lemma_ratio:.3f}")
+    ok = (tag_ratio >= args.tag_thresh) and (lemma_ratio >= args.lemma_thresh)
+    if not ok:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

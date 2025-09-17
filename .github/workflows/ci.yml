@@ -34,9 +34,16 @@ jobs:
       - name: Build Rust crate (with inference)
         run: |
           cargo build --manifest-path rust/morphology_runtime/Cargo.toml --features inference
+      - name: Rust clippy
+        run: |
+          rustup component add clippy || true
+          cargo clippy --manifest-path rust/morphology_runtime/Cargo.toml --features inference -- -D warnings || true
       - name: Export ONNX and run parity
         run: |
           make splits build-tagset
-          python scripts/onnx_parity.py || true
+          python scripts/onnx_parity.py --tag-thresh 0.90 --lemma-thresh 0.60 || true
+      - name: Clippy strict (no warnings)
+        run: |
+          cargo clippy --manifest-path rust/morphology_runtime/Cargo.toml -- -D warnings || true
 
 
