@@ -1,5 +1,11 @@
+from __future__ import annotations
+
+from src.gaeilge_morph.training.runner import run_training, TrainConfig
+
+
 def main() -> None:
-    raise SystemExit("training loop not implemented yet")
+    cfg = TrainConfig()
+    run_training(cfg)
 
 
 if __name__ == "__main__":

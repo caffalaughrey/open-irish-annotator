@@ -1,4 +1,4 @@
-.PHONY: help setup download build-tagset train eval export fmt lint rust-build rust-test
+.PHONY: help setup download splits build-tagset train eval export fmt lint rust-build rust-test
 
 help:
 	@echo "Targets: setup, download, build-tagset, train, eval, export, fmt, lint, rust-build, rust-test"
@@ -9,7 +9,11 @@ setup:
 download:
 	bash scripts/download_ud_irish.sh
 
+splits:
+	python scripts/build_splits.py
+
 build-tagset:
+	python scripts/build_splits.py
 	python scripts/build_tagset.py
 
 train:
