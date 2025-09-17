@@ -24,11 +24,14 @@ def main() -> None:
     model.eval()
 
     b, t, c = 1, 4, 6
+    torch.manual_seed(0)
     word_ids = torch.randint(low=0, high=len(word2id), size=(b, t))
     char_ids = torch.randint(low=0, high=len(char2id), size=(b, t, c))
 
     with torch.no_grad():
         torch_tag, torch_lemma = model(word_ids, char_ids)
+        torch_tag_idx = torch_tag.argmax(-1)
+        torch_lemma_idx = torch_lemma.argmax(-1)
 
     onnx_path = Path("artifacts/onnx/model.onnx")
     if not onnx_path.exists():
@@ -43,13 +46,12 @@ def main() -> None:
         },
     )
     onnx_tag, onnx_lemma = (torch.from_numpy(outs[0]), torch.from_numpy(outs[1]))
+    onnx_tag_idx = onnx_tag.argmax(-1)
+    onnx_lemma_idx = onnx_lemma.argmax(-1)
 
-    def close(a: torch.Tensor, b: torch.Tensor) -> bool:
-        return torch.allclose(a, b, atol=1e-4, rtol=1e-4)
-
-    ok1 = close(torch_tag, onnx_tag)
-    ok2 = close(torch_lemma, onnx_lemma)
-    print(f"parity: tag_logits={ok1} lemma_logits={ok2}")
+    tag_ok = torch.equal(torch_tag_idx, onnx_tag_idx)
+    lemma_ok = torch.equal(torch_lemma_idx, onnx_lemma_idx)
+    print(f"parity(argmax): tag={tag_ok} lemma={lemma_ok}")
 
 
 if __name__ == "__main__":

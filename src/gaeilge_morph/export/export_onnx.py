@@ -54,10 +54,11 @@ def main() -> None:
     # Optionally copy resources next to the Rust runtime resources
     rust_res = Path("rust/morphology_runtime/resources")
     rust_res.mkdir(parents=True, exist_ok=True)
-    for name in ("tagset.json", "word_vocab.json", "char_vocab.json"):
+    for name in ("tagset.json", "word_vocab.json", "char_vocab.json", "lemma_lexicon.json"):
         dst = rust_res / name
         src = processed / name
-        dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
+        if src.exists():
+            dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
 
 if __name__ == "__main__":

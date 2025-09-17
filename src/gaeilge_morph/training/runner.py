@@ -18,7 +18,7 @@ from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader, EOS_CH
 class TrainConfig:
     batch_size: int = 16
     lr: float = 2e-3
-    epochs: int = 1
+    epochs: int = 5
     device: str = "cpu"
     max_chars: int = 24
     max_lemma: int = 24

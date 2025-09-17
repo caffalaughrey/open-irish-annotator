@@ -52,3 +52,12 @@ rust-test:
 	cargo test --manifest-path rust/morphology_runtime/Cargo.toml
 
 
+# Docker helpers
+.PHONY: docker-build docker-shell
+docker-build:
+	docker build -t open-irish-annotator .
+
+docker-shell:
+	docker run -it --rm -v "$(PWD)":/workspace -w /workspace open-irish-annotator bash
+
+

@@ -12,8 +12,11 @@ path = "src/lib.rs"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 thiserror = "1"
+ndarray = { version = "0.15", optional = true }
+tract-onnx = { version = "0.21", optional = true }
 
-# Add onnxruntime later with proper features once the model is exported
-# onnxruntime = { version = "0.0", features = ["copy-dylibs"] }
+[features]
+default = []
+inference = ["tract-onnx", "ndarray"]
 
 

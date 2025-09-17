@@ -13,7 +13,7 @@ authors = [
   { name = "Open Irish Annotator" }
 ]
 dependencies = [
-  "numpy>=1.24",
+  "numpy>=1.24,<2.0",
   "pydantic>=2.6",
   "pyyaml>=6.0",
   "tqdm>=4.66",
@@ -35,8 +35,10 @@ dev = [
 ]
 
 [tool.setuptools]
-packages = ["src/gaeilge_morph"]
 package-dir = {"" = "src"}
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["gaeilge_morph*"]
 
 [tool.ruff]
 line-length = 100

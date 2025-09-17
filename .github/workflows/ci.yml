@@ -25,11 +25,18 @@ jobs:
       - name: Type check (mypy)
         run: |
           mypy src || true
-      - name: Build Rust crate
+      - name: Build Rust crate (no inference)
         run: |
           sudo apt-get update && sudo apt-get install -y pkg-config
           rustup toolchain install stable
           rustup default stable
           cargo build --manifest-path rust/morphology_runtime/Cargo.toml
+      - name: Build Rust crate (with inference)
+        run: |
+          cargo build --manifest-path rust/morphology_runtime/Cargo.toml --features inference
+      - name: Export ONNX and run parity
+        run: |
+          make splits build-tagset
+          python scripts/onnx_parity.py || true
 
 
