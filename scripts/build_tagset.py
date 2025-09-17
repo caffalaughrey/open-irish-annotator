@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import List
-import json
 
 from gaeilge_morph.data import (
     read_conllu_sentences,
@@ -43,9 +42,7 @@ def main() -> None:
     save_json(tag2id, processed_root / "tagset.json")
     save_json(word2id, processed_root / "word_vocab.json")
     save_json(char2id, processed_root / "char_vocab.json")
-    print(
-        f"Built resources: {len(tag2id)} tags, {len(word2id)} words, {len(char2id)} chars → data/processed"
-    )
+    print(f"Built resources: {len(tag2id)} tags, {len(word2id)} words, {len(char2id)} chars → data/processed")
 
 
 if __name__ == "__main__":

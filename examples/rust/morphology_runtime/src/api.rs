@@ -38,11 +38,11 @@ pub struct MorphologyRuntime {
 }
 
 impl MorphologyRuntime {
-    pub fn new_from_resources(model_path: &str, resources_dir: &str) -> Result<Self, MorphError> {
+    pub fn new_from_resources(_model_path: &str, resources_dir: &str) -> Result<Self, MorphError> {
         #[cfg(feature = "inference")]
         let model = tract_onnx::onnx()
-            .model_for_path(model_path)
-            .map_err(|_| MorphError::ResourceNotFound(model_path.to_string()))?
+            .model_for_path(_model_path)
+            .map_err(|_| MorphError::ResourceNotFound(_model_path.to_string()))?
             .with_input_names(vec!["word_ids", "char_ids"]).map_err(|e| MorphError::InvalidState(format!("names: {e}")))?
             .into_optimized().map_err(|e| MorphError::InvalidState(format!("opt: {e}")))?
             .into_runnable().map_err(|e| MorphError::InvalidState(format!("run: {e}")))?;
@@ -112,10 +112,10 @@ impl MorphologyRuntime {
         #[cfg(not(feature = "inference"))]
         {
             // Fallback: echo tokens with placeholders
-            return Ok(tokens
+            Ok(tokens
                 .into_iter()
                 .map(|t| TokenAnalysis { token: t.clone(), tag: "X".to_string(), lemma: t })
-                .collect());
+                .collect())
         }
 
         #[cfg(feature = "inference")]

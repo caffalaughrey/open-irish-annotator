@@ -11,7 +11,7 @@ from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
 from gaeilge_morph.models.model import GaelicMorphModel
-from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader, EOS_CHAR_ID
+from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader
 
 
 @dataclass
@@ -48,9 +48,9 @@ def compute_losses(
     tag_loss = tag_loss_fn(tag_logits.view(b * t, k), tag_ids.view(b * t))
 
     # Lemma loss: only over non-pad time steps; EOS marks end, but we train full length
-    b, t, l, c = lemma_logits.shape
+    b, t, lemma_len, num_chars = lemma_logits.shape
     lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0)  # PAD_CHAR_ID == 0
-    lemma_loss = lemma_loss_fn(lemma_logits.view(b * t * l, c), lemma_char_ids.view(b * t * l))
+    lemma_loss = lemma_loss_fn(lemma_logits.view(b * t * lemma_len, num_chars), lemma_char_ids.view(b * t * lemma_len))
 
     return tag_loss_weight * tag_loss + lemma_loss_weight * lemma_loss
 

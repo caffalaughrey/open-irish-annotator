@@ -12,6 +12,7 @@ help:
 
 setup:
 	$(PY) -m venv .venv && . .venv/bin/activate && $(PY) -m pip install --upgrade pip && $(PY) -m pip install -e .[dev]
+	. .venv/bin/activate && ruff --version && mypy --version || true
 
 download:
 	bash scripts/download_ud_irish.sh
@@ -43,7 +44,7 @@ fmt:
 lint:
 	ruff check . || true
 	mypy src || true
-	cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml -- -D warnings || true
+	cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference -- -D warnings || true
 
 rust-build:
 	cargo build --manifest-path examples/rust/morphology_runtime/Cargo.toml

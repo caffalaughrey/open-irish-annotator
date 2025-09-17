@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from src.gaeilge_morph.training.runner import run_training, TrainConfig
+from gaeilge_morph.training.runner import run_training, TrainConfig
 
 
 def main() -> None:

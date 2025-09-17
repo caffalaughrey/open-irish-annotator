@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import json
-from typing import List
 
 from gaeilge_morph.data import read_conllu_sentences
 
