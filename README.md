@@ -51,6 +51,15 @@ The Rust crate under `rust/morphology_runtime` will load the ONNX model and asso
 
 ONNX I/O
 --------
+- CLI examples:
+
+```bash
+# via args
+cargo run --manifest-path rust/morphology_runtime/Cargo.toml --features inference --bin analyze -- "Is" "maidin" "bhreá" "í"
+
+# via stdin (one sentence per line, space tokenized)
+echo "Is maidin bhreá í" | cargo run --manifest-path rust/morphology_runtime/Cargo.toml --features inference --bin analyze --
+```
 
 - Input: `word_ids` [batch, tokens] int64; `char_ids` [batch, tokens, chars] int64
 - Output: `tag_logits` [batch, tokens, num_tags]; `lemma_logits` [batch, tokens, lemma_len, num_chars]

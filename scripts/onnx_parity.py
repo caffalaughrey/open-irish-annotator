@@ -23,35 +23,48 @@ def main() -> None:
         model.load_state_dict(torch.load(ckpt, map_location="cpu"))
     model.eval()
 
-    b, t, c = 1, 4, 6
-    torch.manual_seed(0)
-    word_ids = torch.randint(low=0, high=len(word2id), size=(b, t))
-    char_ids = torch.randint(low=0, high=len(char2id), size=(b, t, c))
-
-    with torch.no_grad():
-        torch_tag, torch_lemma = model(word_ids, char_ids)
-        torch_tag_idx = torch_tag.argmax(-1)
-        torch_lemma_idx = torch_lemma.argmax(-1)
+    # Multiple trials for stability
+    trials = 5
+    t, c = 8, 10
+    torch.manual_seed(42)
+    total_tokens = 0
+    tag_equal = 0
+    lemma_equal = 0
 
     onnx_path = Path("artifacts/onnx/model.onnx")
     if not onnx_path.exists():
         raise SystemExit("Export ONNX first (make export)")
 
     sess = ort.InferenceSession(onnx_path.as_posix(), providers=["CPUExecutionProvider"])
-    outs = sess.run(
-        None,
-        {
-            "word_ids": word_ids.numpy().astype(np.int64),
-            "char_ids": char_ids.numpy().astype(np.int64),
-        },
-    )
-    onnx_tag, onnx_lemma = (torch.from_numpy(outs[0]), torch.from_numpy(outs[1]))
-    onnx_tag_idx = onnx_tag.argmax(-1)
-    onnx_lemma_idx = onnx_lemma.argmax(-1)
+    for _ in range(trials):
+        word_ids = torch.randint(low=0, high=len(word2id), size=(1, t))
+        char_ids = torch.randint(low=0, high=len(char2id), size=(1, t, c))
 
-    tag_ok = torch.equal(torch_tag_idx, onnx_tag_idx)
-    lemma_ok = torch.equal(torch_lemma_idx, onnx_lemma_idx)
-    print(f"parity(argmax): tag={tag_ok} lemma={lemma_ok}")
+        with torch.no_grad():
+            torch_tag, torch_lemma = model(word_ids, char_ids)
+            torch_tag_idx = torch_tag.argmax(-1)
+            torch_lemma_idx = torch_lemma.argmax(-1)
+
+        outs = sess.run(
+            None,
+            {
+                "word_ids": word_ids.numpy().astype(np.int64),
+                "char_ids": char_ids.numpy().astype(np.int64),
+            },
+        )
+        onnx_tag, onnx_lemma = (torch.from_numpy(outs[0]), torch.from_numpy(outs[1]))
+        onnx_tag_idx = onnx_tag.argmax(-1)
+        onnx_lemma_idx = onnx_lemma.argmax(-1)
+
+        eq_tag = (torch_tag_idx == onnx_tag_idx).sum().item()
+        eq_lemma = (torch_lemma_idx == onnx_lemma_idx).all(-1).sum().item()
+        tag_equal += eq_tag
+        lemma_equal += eq_lemma
+        total_tokens += t
+
+    tag_ratio = tag_equal / max(total_tokens, 1)
+    lemma_ratio = lemma_equal / max(total_tokens, 1)
+    print(f"parity(argmax): tag={tag_ratio:.3f} lemma_token_exact={lemma_ratio:.3f}")
 
 
 if __name__ == "__main__":
