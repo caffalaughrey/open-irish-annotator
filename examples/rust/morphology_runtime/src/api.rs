@@ -34,6 +34,7 @@ pub struct MorphologyRuntime {
     word_str_to_id: HashMap<String, i64>,
     lemma_lexicon: HashMap<String, String>,
     char_to_id: HashMap<char, i64>,
+    external_lexicon: HashMap<String, String>,
 }
 
 impl MorphologyRuntime {
@@ -80,12 +81,20 @@ impl MorphologyRuntime {
             char_to_id.insert(ch, id);
         }
 
-        // Optional lemma lexicon
+        // Optional lemma lexicon (from training)
         let lemma_lexicon: HashMap<String, String> = if lemma_lexicon_path.exists() {
             serde_json::from_str(&fs::read_to_string(&lemma_lexicon_path).unwrap_or_default()).unwrap_or_default()
         } else {
             HashMap::new()
         };
+
+        // Optional external lexicon (e.g., Mechura list) via env var MORPH_EXT_LEMMA
+        let external_lexicon: HashMap<String, String> = if let Ok(p) = std::env::var("MORPH_EXT_LEMMA") {
+            let path = Path::new(&p);
+            if path.exists() {
+                serde_json::from_str(&fs::read_to_string(path).unwrap_or_default()).unwrap_or_default()
+            } else { HashMap::new() }
+        } else { HashMap::new() };
 
         Ok(Self {
             #[cfg(feature = "inference")]
@@ -95,6 +104,7 @@ impl MorphologyRuntime {
             word_str_to_id: word_map,
             lemma_lexicon,
             char_to_id,
+            external_lexicon,
         })
     }
 
@@ -186,10 +196,9 @@ impl MorphologyRuntime {
                     lemma_s.push(ch);
                 }
             }
-            // Prefer training lexicon if available; else keep decoded lemma (trimmed)
-            if let Some(best) = self.lemma_lexicon.get(&tokens[i]) {
-                lemma_s = best.clone();
-            }
+            // Prefer training lexicon; otherwise fallback to external lexicon if present
+            if let Some(best) = self.lemma_lexicon.get(&tokens[i]) { lemma_s = best.clone(); }
+            else if let Some(ext) = self.external_lexicon.get(&tokens[i]) { lemma_s = ext.clone(); }
 
             results.push(TokenAnalysis {
                 token: tokens[i].clone(),
