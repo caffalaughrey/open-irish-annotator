@@ -1,4 +1,4 @@
-.PHONY: help setup download splits build-tagset train eval export fmt lint rust-build rust-test
+.PHONY: help setup download splits build-tagset train eval export parity fmt lint rust-build rust-test
 
 help:
 	@echo "Targets: setup, download, build-tagset, train, eval, export, fmt, lint, rust-build, rust-test"
@@ -24,6 +24,9 @@ eval:
 
 export:
 	python -m src.gaeilge_morph.export.export_onnx || echo "Export stub not implemented yet"
+
+parity:
+	python scripts/onnx_parity.py
 
 fmt:
 	ruff check --select I --fix . || true

@@ -19,6 +19,10 @@ def main() -> None:
         char_vocab_size=len(char_vocab),
         tagset_size=len(tagset),
     )
+    # Load trained weights if available
+    ckpt = Path("artifacts/checkpoints/model.pt")
+    if ckpt.exists():
+        model.load_state_dict(torch.load(ckpt, map_location="cpu"))
     model.eval()
 
     # Dummy dynamic shapes
@@ -47,6 +51,13 @@ def main() -> None:
             opset_version=17,
         )
     print(f"Exported ONNX to {onnx_path}")
+    # Optionally copy resources next to the Rust runtime resources
+    rust_res = Path("rust/morphology_runtime/resources")
+    rust_res.mkdir(parents=True, exist_ok=True)
+    for name in ("tagset.json", "word_vocab.json", "char_vocab.json"):
+        dst = rust_res / name
+        src = processed / name
+        dst.write_text(src.read_text(encoding="utf-8"), encoding="utf-8")
 
 
 if __name__ == "__main__":
