@@ -8,7 +8,7 @@ import numpy as np
 import onnxruntime as ort
 import torch
 
-from src.gaeilge_morph.models.model import GaelicMorphModel
+from gaeilge_morph.models.model import GaelicMorphModel
 
 
 def main() -> None:

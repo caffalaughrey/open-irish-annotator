@@ -1,32 +1,33 @@
 .PHONY: help setup download splits build-tagset train eval export parity fmt lint rust-build rust-test
+PY ?= python3
 
 help:
-	@echo "Targets: setup, download, build-tagset, train, eval, export, fmt, lint, rust-build, rust-test"
+	@echo "Targets: setup, download, splits, build-tagset, train, eval, export, parity, fmt, lint, rust-build, rust-test"
 
 setup:
-	python -m venv .venv && . .venv/bin/activate && pip install --upgrade pip && pip install -e .[dev]
+	$(PY) -m venv .venv && . .venv/bin/activate && $(PY) -m pip install --upgrade pip && $(PY) -m pip install -e .[dev]
 
 download:
 	bash scripts/download_ud_irish.sh
 
 splits:
-	python scripts/build_splits.py
+	$(PY) scripts/build_splits.py
 
 build-tagset:
-	python scripts/build_splits.py
-	python scripts/build_tagset.py
+	$(PY) scripts/build_splits.py
+	$(PY) scripts/build_tagset.py
 
 train:
-	python -m src.gaeilge_morph.training.train || echo "Training stub not implemented yet"
+	$(PY) -m src.gaeilge_morph.training.train || echo "Training stub not implemented yet"
 
 eval:
-	python -m src.gaeilge_morph.eval.evaluate || echo "Eval stub not implemented yet"
+	$(PY) -m src.gaeilge_morph.eval.evaluate || echo "Eval stub not implemented yet"
 
 export:
-	python -m src.gaeilge_morph.export.export_onnx || echo "Export stub not implemented yet"
+	$(PY) -m src.gaeilge_morph.export.export_onnx || echo "Export stub not implemented yet"
 
 parity:
-	python scripts/onnx_parity.py
+	$(PY) scripts/onnx_parity.py
 
 fmt:
 	ruff check --select I --fix . || true

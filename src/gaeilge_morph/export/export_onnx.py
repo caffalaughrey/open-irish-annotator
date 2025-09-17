@@ -5,7 +5,7 @@ from pathlib import Path
 
 import torch
 
-from src.gaeilge_morph.models.model import GaelicMorphModel
+from gaeilge_morph.models.model import GaelicMorphModel
 
 
 def main() -> None:

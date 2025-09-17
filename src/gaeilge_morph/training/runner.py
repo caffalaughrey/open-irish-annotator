@@ -10,8 +10,8 @@ from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
-from src.gaeilge_morph.models.model import GaelicMorphModel
-from src.gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader, EOS_CHAR_ID
+from gaeilge_morph.models.model import GaelicMorphModel
+from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader, EOS_CHAR_ID
 
 
 @dataclass

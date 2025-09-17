@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List
 import json
 
-from src.gaeilge_morph.data import (
+from gaeilge_morph.data import (
     read_conllu_sentences,
     build_tagset,
     build_vocabs,

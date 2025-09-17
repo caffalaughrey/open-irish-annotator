@@ -5,7 +5,7 @@ from pathlib import Path
 import json
 from typing import List
 
-from src.gaeilge_morph.data import read_conllu_sentences
+from gaeilge_morph.data import read_conllu_sentences
 
 
 def find_split_files(raw_root: Path):
