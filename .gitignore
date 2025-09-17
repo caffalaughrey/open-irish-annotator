@@ -5,14 +5,15 @@
 __pycache__/
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 .venv/
-env/
 venv/
-dist/
-build/
+env/
 *.egg-info/
 
-# Data and artifacts
+# Data and artifacts (generated)
+data/raw/
+data/processed/
 data/cache/
 artifacts/
 
@@ -31,16 +32,7 @@ target/
 
 # Node (if any examples later)
 node_modules/
-.DS_Store
-.env
-venv/
-.venv/
-.vscode/
-.idea/
-.pytest_cache/
-.ruff_cache/
-.mypy_cache/
+
+# Cursor/Editor metadata
 .cursorrules
 .cursorignore
-.cursorignore
-RESEARCH.md
