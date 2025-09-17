@@ -121,6 +121,7 @@ def run_training(cfg: TrainConfig) -> None:
         word_vocab_size=len(word2id),
         char_vocab_size=len(char2id),
         tagset_size=len(tag2id),
+        lemma_max_len=cfg.max_lemma,
     ).to(device)
     optimizer = AdamW(model.parameters(), lr=cfg.lr)
 
