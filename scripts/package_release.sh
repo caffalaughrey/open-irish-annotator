@@ -3,7 +3,7 @@ set -euo pipefail
 
 VERSION=${1:-"0.1.0"}
 OUT_DIR="artifacts/releases/${VERSION}"
-RES_DIR="rust/morphology_runtime/resources"
+RES_DIR="examples/rust/morphology_runtime/resources"
 MODEL="${RES_DIR}/model.onnx"
 
 if [ ! -f "$MODEL" ]; then

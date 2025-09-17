@@ -52,7 +52,7 @@ def main() -> None:
         )
     print(f"Exported ONNX to {onnx_path}")
     # Optionally copy resources next to the Rust runtime resources
-    rust_res = Path("rust/morphology_runtime/resources")
+    rust_res = Path("examples/rust/morphology_runtime/resources")
     rust_res.mkdir(parents=True, exist_ok=True)
     for name in ("tagset.json", "word_vocab.json", "char_vocab.json", "lemma_lexicon.json"):
         dst = rust_res / name

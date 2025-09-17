@@ -38,18 +38,18 @@ parity:
 fmt:
 	ruff check --select I --fix . || true
 	black . || true
-	cargo fmt --manifest-path rust/morphology_runtime/Cargo.toml || true
+	cargo fmt --manifest-path examples/rust/morphology_runtime/Cargo.toml || true
 
 lint:
 	ruff check . || true
 	mypy src || true
-	cargo clippy --manifest-path rust/morphology_runtime/Cargo.toml -- -D warnings || true
+	cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml -- -D warnings || true
 
 rust-build:
-	cargo build --manifest-path rust/morphology_runtime/Cargo.toml
+	cargo build --manifest-path examples/rust/morphology_runtime/Cargo.toml
 
 rust-test:
-	cargo test --manifest-path rust/morphology_runtime/Cargo.toml
+	cargo test --manifest-path examples/rust/morphology_runtime/Cargo.toml
 
 release:
 	bash scripts/package_release.sh $(VERSION)

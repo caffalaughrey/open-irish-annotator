@@ -20,21 +20,42 @@ function encode(tokens, word2id, char2id, maxChars=24) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const argv = process.argv.slice(2);
+  let modelPath = 'artifacts/onnx/model.onnx';
+  let resDir = 'rust/morphology_runtime/resources';
+  let preferLex = false;
+  const args = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (argv[i] === '--model' && argv[i+1]) { modelPath = argv[i+1]; i++; continue; }
+    if (argv[i] === '--resources' && argv[i+1]) { resDir = argv[i+1]; i++; continue; }
+    if (argv[i] === '--prefer-lexicon') { preferLex = true; continue; }
+    args.push(argv[i]);
+  }
   if (args.length === 0) {
-    console.error('usage: node scripts/node_analyze.mjs <token> [<token> ...]');
+    console.error('usage: node examples/nodejs/analyze.mjs [--model path] [--resources dir] <token> [<token> ...]');
     process.exit(1);
   }
-  const resDir = 'rust/morphology_runtime/resources';
+  if (!fs.existsSync(path.join(resDir, 'tagset.json'))) {
+    // try project-root relative from examples/
+    const alt = path.join(process.cwd(), '../../rust/morphology_runtime/resources');
+    if (fs.existsSync(path.join(alt, 'tagset.json'))) resDir = alt;
+  }
   const tag2id = loadJson(path.join(resDir, 'tagset.json'));
   const word2id = loadJson(path.join(resDir, 'word_vocab.json'));
   const char2id = loadJson(path.join(resDir, 'char_vocab.json'));
   const id2tag = Object.entries(tag2id).sort((a,b)=>a[1]-b[1]).map(([k])=>k);
   const id2ch = Object.entries(char2id).sort((a,b)=>a[1]-b[1]).map(([k])=>k);
+  let lemmaLex = {};
+  const lexPath = path.join(resDir, 'lemma_lexicon.json');
+  if (fs.existsSync(lexPath)) lemmaLex = loadJson(lexPath);
 
   const { wordIds, charIds, t, maxChars } = encode(args, word2id, char2id);
 
-  const session = await ort.InferenceSession.create('artifacts/onnx/model.onnx');
+  if (!fs.existsSync(modelPath)) {
+    const altModel = path.join(process.cwd(), '../../artifacts/onnx/model.onnx');
+    if (fs.existsSync(altModel)) modelPath = altModel;
+  }
+  const session = await ort.InferenceSession.create(modelPath);
   const feeds = {
     word_ids: new ort.Tensor('int64', wordIds, [1, t]),
     char_ids: new ort.Tensor('int64', charIds, [1, t, maxChars])
@@ -78,7 +99,8 @@ async function main() {
       if (cid === 1) break; // EOS
       chars.push(id2ch[cid] ?? '?');
     }
-    const lemma = chars.length ? chars.join('') : args[i];
+    const decoded = chars.length ? chars.join('') : args[i];
+    const lemma = preferLex ? (lemmaLex[args[i]] ?? decoded) : (decoded || lemmaLex[args[i]] || decoded);
     console.log(`${args[i]}\t${tag}\t${lemma}`);
   }
 }

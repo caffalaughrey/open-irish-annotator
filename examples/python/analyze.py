@@ -15,7 +15,9 @@ def load_resources(res_dir: Path):
     word2id = json.loads((res_dir / "word_vocab.json").read_text(encoding="utf-8"))
     char2id = json.loads((res_dir / "char_vocab.json").read_text(encoding="utf-8"))
     tag_id2str = [t for t, _ in sorted(tag2id.items(), key=lambda kv: kv[1])]
-    return tag_id2str, word2id, char2id
+    lex_path = res_dir / "lemma_lexicon.json"
+    lemma_lex = json.loads(lex_path.read_text(encoding="utf-8")) if lex_path.exists() else {}
+    return tag_id2str, word2id, char2id, lemma_lex
 
 
 def encode(tokens: List[str], word2id, char2id, max_chars: int = 24):
@@ -38,10 +40,11 @@ def main():
         default="rust/morphology_runtime/resources",
         help="directory with tagset/word_vocab/char_vocab",
     )
+    ap.add_argument("--prefer-lexicon", action="store_true", help="prefer lemma_lexicon.json if present")
     args = ap.parse_args()
 
     res_dir = Path(args.resources)
-    tag_id2str, word2id, char2id = load_resources(res_dir)
+    tag_id2str, word2id, char2id, lemma_lex = load_resources(res_dir)
 
     if not args.tokens:
         print("usage: onnx_analyze.py <token> [<token> ...]")
@@ -64,7 +67,8 @@ def main():
             if cid == 1:
                 break
             lemma_chars.append(id2ch[cid] if cid < len(id2ch) else "?")
-        lemma = "".join(lemma_chars) or tok
+        decoded = "".join(lemma_chars) or tok
+        lemma = lemma_lex.get(tok, decoded) if args.prefer_lexicon else (decoded or lemma_lex.get(tok, decoded))
         results.append((tok, tag, lemma))
 
     for tok, tag, lemma in results:

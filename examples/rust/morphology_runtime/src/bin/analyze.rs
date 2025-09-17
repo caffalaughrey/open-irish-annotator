@@ -2,11 +2,20 @@ use morphology_runtime::api::MorphologyRuntime;
 
 fn main() {
     let crate_dir = env!("CARGO_MANIFEST_DIR");
-    let model_path = format!("{}/resources/model.onnx", crate_dir);
-    let res_dir = format!("{}/resources", crate_dir);
+    let mut model_path = format!("{}/resources/model.onnx", crate_dir);
+    let mut res_dir = format!("{}/resources", crate_dir);
+
+    let mut args: Vec<String> = std::env::args().skip(1).collect();
+    let mut i = 0;
+    while i < args.len() {
+        if args[i] == "--model" && i + 1 < args.len() { model_path = args[i+1].clone(); args.drain(i..=i+1); continue; }
+        if args[i] == "--resources" && i + 1 < args.len() { res_dir = args[i+1].clone(); args.drain(i..=i+1); continue; }
+        i += 1;
+    }
+
     let runtime = MorphologyRuntime::new_from_resources(&model_path, &res_dir)
         .expect("failed to init runtime");
-    let args: Vec<String> = std::env::args().skip(1).collect();
+
     if args.is_empty() {
         use std::io::{self, Read};
         let mut buf = String::new();

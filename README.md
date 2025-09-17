@@ -47,7 +47,7 @@ make setup
 Rust runtime
 ------------
 
-The Rust crate under `rust/morphology_runtime` will load the ONNX model and associated resources and expose a simple API. For now it contains a stub implementation that compiles without ONNX; the ONNX dependency will be added once the model export stabilizes.
+The Rust crate under `examples/rust/morphology_runtime` will load the ONNX model and associated resources and expose a simple API. For now it contains a stub implementation that compiles without ONNX; the ONNX dependency will be added once the model export stabilizes.
 
 ONNX I/O
 --------
@@ -59,10 +59,10 @@ ONNX I/O
 
 ```bash
 # via args
-cargo run --manifest-path rust/morphology_runtime/Cargo.toml --features inference --bin analyze -- "Is" "maidin" "bhreá" "í"
+cargo run --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference --bin analyze -- "Is" "maidin" "bhreá" "í"
 
 # via stdin (one sentence per line, space tokenized)
-echo "Is maidin bhreá í" | cargo run --manifest-path rust/morphology_runtime/Cargo.toml --features inference --bin analyze --
+echo "Is maidin bhreá í" | cargo run --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference --bin analyze --
 ```
 
 Use from another Rust project
@@ -78,12 +78,12 @@ Assets you need to ship with your app:
 
 How to depend on the runtime crate:
 
-- Add this repo as a git submodule, then a path dependency to the crate under `rust/morphology_runtime`.
+- Add this repo as a git submodule, then a path dependency to the crate under `examples/rust/morphology_runtime`.
 
 ```toml
 # Cargo.toml
 [dependencies]
-morphology_runtime = { path = "submodules/open-irish-annotator/rust/morphology_runtime", features = ["inference"] }
+morphology_runtime = { path = "submodules/open-irish-annotator/examples/rust/morphology_runtime", features = ["inference"] }
 ```
 
 Minimal usage:
