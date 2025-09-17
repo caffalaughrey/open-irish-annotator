@@ -20,9 +20,13 @@ def read_conllu_sentences(path: Path) -> Iterable[Sentence]:
         for toklist in parse_incr(f):
             tokens, lemmas, tag_strings = [], [], []
             for tok in toklist:
-                if tok.get("misc", {}).get("SpaceAfter") == "No":
-                    pass
-                form = tok.get("form") or ""
+                # Skip multi-word token lines which appear as None dicts
+                if tok is None:
+                    continue
+                # conllu may return OrderedDict-like; guard missing fields
+                form = tok.get("form")
+                if form is None:
+                    continue
                 lemma = tok.get("lemma") or ""
                 upos = tok.get("upostag") or "X"
                 feats = tok.get("feats") or {}
@@ -31,7 +35,8 @@ def read_conllu_sentences(path: Path) -> Iterable[Sentence]:
                 tokens.append(form)
                 lemmas.append(lemma)
                 tag_strings.append(tag)
-            yield Sentence(tokens=tokens, lemmas=lemmas, tag_strings=tag_strings)
+            if tokens:
+                yield Sentence(tokens=tokens, lemmas=lemmas, tag_strings=tag_strings)
 
 
 def build_tagset(sentences: Iterable[Sentence]) -> Dict[str, int]:

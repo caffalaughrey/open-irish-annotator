@@ -15,24 +15,33 @@ python -m pip install --upgrade pip
 pip install -e .[dev]
 ```
 
-2) Download UD Irish-IDT data:
+2) Download UD Irish-IDT data and prepare splits/resources:
 
 ```bash
-bash scripts/download_ud_irish.sh
+make download
+make splits
+make build-tagset
 ```
 
-3) Build tagset/vocabs (stub):
-
-```bash
-python scripts/build_tagset.py
-```
-
-4) Train / Evaluate / Export ONNX (to be implemented):
+3) Train / Evaluate / Export ONNX:
 
 ```bash
 make train
 make eval
 make export
+make parity
+```
+
+Containers (optional)
+---------------------
+
+Build and open a devcontainer:
+
+```bash
+docker build -t open-irish-annotator .
+docker run -it --rm -v "$PWD":/workspace -w /workspace open-irish-annotator bash
+# inside container
+make setup
 ```
 
 Rust runtime
