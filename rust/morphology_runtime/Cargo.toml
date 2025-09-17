@@ -1,0 +1,19 @@
+[package]
+name = "morphology_runtime"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+
+[lib]
+name = "morphology_runtime"
+path = "src/lib.rs"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "1"
+
+# Add onnxruntime later with proper features once the model is exported
+# onnxruntime = { version = "0.0", features = ["copy-dylibs"] }
+
+
