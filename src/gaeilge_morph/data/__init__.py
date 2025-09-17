@@ -20,9 +20,9 @@ def read_conllu_sentences(path: Path) -> Iterable[Sentence]:
         for toklist in parse_incr(f):
             tokens, lemmas, tag_strings = [], [], []
             for tok in toklist:
-                # Skip multi-word token lines which appear as None dicts
+                # Skip multi-word token lines which may appear as None in some CoNLL-U readers
                 if tok is None:
-                    continue
+                    continue  # type: ignore[unreachable]
                 # conllu may return OrderedDict-like; guard missing fields
                 form = tok.get("form")
                 if form is None:
