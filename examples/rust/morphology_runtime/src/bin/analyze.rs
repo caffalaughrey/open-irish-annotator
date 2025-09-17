@@ -3,8 +3,8 @@ use std::path::Path;
 
 fn main() {
     let crate_dir = env!("CARGO_MANIFEST_DIR");
-    let mut model_path = format!("{}/resources/model.onnx", crate_dir);
-    let mut res_dir = format!("{}/resources", crate_dir);
+    let mut model_path = format!("{crate_dir}/resources/model.onnx");
+    let mut res_dir = format!("{crate_dir}/resources");
 
     let mut args: Vec<String> = std::env::args().skip(1).collect();
     let mut i = 0;
@@ -21,9 +21,9 @@ fn main() {
             model_path = alt.to_string();
         }
     }
-    if !Path::new(&format!("{}/tagset.json", res_dir)).exists() {
+    if !Path::new(&format!("{res_dir}/tagset.json")).exists() {
         let alt = "data/processed";
-        if Path::new(&format!("{}/tagset.json", alt)).exists() {
+        if Path::new(&format!("{alt}/tagset.json")).exists() {
             res_dir = alt.to_string();
         }
     }

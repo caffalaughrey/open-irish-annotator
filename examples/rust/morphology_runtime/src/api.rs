@@ -7,6 +7,9 @@ use std::path::Path;
 #[cfg(feature = "inference")]
 use tract_onnx::prelude::*;
 
+#[cfg(feature = "inference")]
+type InferenceModel = SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>;
+
 #[derive(Debug, Error)]
 pub enum MorphError {
     #[error("resource not found: {0}")]
@@ -25,7 +28,7 @@ pub struct TokenAnalysis {
 #[derive(Debug)]
 pub struct MorphologyRuntime {
     #[cfg(feature = "inference")]
-    model: SimplePlan<TypedFact, Box<dyn TypedOp>, Graph<TypedFact, Box<dyn TypedOp>>>,
+    model: InferenceModel,
     tag_id_to_str: Vec<String>,
     char_id_to_ch: Vec<char>,
     word_str_to_id: HashMap<String, i64>,
@@ -117,15 +120,10 @@ impl MorphologyRuntime {
             let wid = *self.word_str_to_id.get(tok).unwrap_or(&1); // 1 = <unk>
             word_ids.push(wid);
             let mut chbuf = vec![pad_char_id; max_chars];
-            let mut i = 0;
-            for ch in tok.chars() {
-                if i >= max_chars - 1 {
-                    break;
-                }
+            for (i, ch) in tok.chars().take(max_chars - 1).enumerate() {
                 // map char to id with hashmap, default to <unk>=2
                 let cid = *self.char_to_id.get(&ch).unwrap_or(&2);
                 chbuf[i] = cid;
-                i += 1;
             }
             char_ids.extend_from_slice(&chbuf);
         }

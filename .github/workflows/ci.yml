@@ -24,7 +24,7 @@ jobs:
           black --check .
       - name: Type check (mypy)
         run: |
-          mypy src || true
+          mypy src
       - name: Build Rust crate (no inference)
         run: |
           sudo apt-get update && sudo apt-get install -y pkg-config
@@ -40,6 +40,6 @@ jobs:
           python scripts/onnx_parity.py --tag-thresh 0.90 --lemma-thresh 0.60 || true
       - name: Clippy strict (no warnings)
         run: |
-          cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml -- -D warnings || true
+          cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference -- -D warnings
 
 
