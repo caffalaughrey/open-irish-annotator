@@ -32,14 +32,23 @@ make export
 make parity
 ```
 
+Training tips (fast iteration and stability)
+-------------------------------------------
+
+- Subset pilots: `--subset-frac 0.2` (or 0.5) for quick signals.
+- Length bucketing: `--bucket-by-len` to reduce padding for RNNs.
+- Early stopping: `--early-stop-patience 2` to cap pilot runs.
+- Resume warm-start: `--resume-path artifacts/checkpoints/best.pt` (loads weights only).
+- Optim/loss: `--use-onecycle` and `--label-smoothing 0.05` are supported; disable for conservative runs.
+- KD (optional): build teacher JSONLs `make teacher`, then add `--use-kd` (weights: `--kd-tag-weight`, `--kd-lemma-weight`).
+- Model capacity (optional): `--word-emb-dim`, `--char-emb-dim`, `--char-cnn-out`, `--encoder-hidden`.
+
 Artifacts and resources
 -----------------------
 
 - Model: `artifacts/onnx/model.onnx`
 - Resources (built via step 2): `data/processed/tagset.json`, `word_vocab.json`, `char_vocab.json`, optional `lemma_lexicon.json`
-
-Rust runtime
-------------
+- Packaged release tarball (versioned): `artifacts/releases/<ver>/gaeilge-morph-<ver>.tar.gz`
 
 Rust runtime / CLI
 ------------------
@@ -65,6 +74,10 @@ Flags:
 
 - `--model <path>` (default fallback: `artifacts/onnx/model.onnx`)
 - `--resources <dir>` (default fallback: `data/processed`)
+
+Environment:
+
+- `MORPH_EXT_LEMMA` (optional): path to external lemma JSON (e.g., Mechura list) to prefer as fallback.
 ```
 
 Use from another Rust project
@@ -116,8 +129,8 @@ Release
 
 ```bash
 make export
-make release VERSION=0.1.0
-ls artifacts/releases/0.1.0/
+make release VERSION=0.1.1
+ls artifacts/releases/0.1.1/
 ```
 
 Parity thresholds (CI)
@@ -135,13 +148,17 @@ Use the artifact from other languages
 Python (ONNX Runtime):
 
 ```bash
-python scripts/onnx_analyze.py Is maidin bhreá í
+python examples/python/analyze.py Is maidin bhreá í
+# Prefer lexicon fallback if available
+PREFER_LEXICON=1 python examples/python/analyze.py Is maidin bhreá í
 ```
 
 Node.js (onnxruntime-node):
 
 ```bash
-node scripts/node_analyze.mjs Is maidin bhreá í
+node examples/nodejs/analyze.mjs Is maidin bhreá í
+# Prefer lexicon fallback if available
+PREFER_LEXICON=1 node examples/nodejs/analyze.mjs Is maidin bhreá í
 ```
 
 

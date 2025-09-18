@@ -30,7 +30,8 @@ def main() -> None:
     total_lemmas = 0
     with torch.no_grad():
         for batch in loader:
-            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = batch
+            # Batch may include optional teacher tensors at the end; ignore them
+            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = batch[:5]
             tag_logits, lemma_logits = model(word_ids, char_ids, lemma_char_ids)
             preds = tag_logits.argmax(-1)
             mask = token_mask

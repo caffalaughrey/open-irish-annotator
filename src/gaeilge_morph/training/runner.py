@@ -42,6 +42,15 @@ class TrainConfig:
     freeze_encoder: bool = False
     freeze_embeddings: bool = False
     bucket_by_len: bool = False
+    use_onecycle: bool = True
+    use_kd: bool = False
+    kd_tag_weight: float = 0.3
+    kd_lemma_weight: float = 0.3
+    # Model capacity
+    word_emb_dim: int = 128
+    char_emb_dim: int = 48
+    char_cnn_out: int = 64
+    encoder_hidden: int = 256
 
 
 def load_resources(processed: Path):
@@ -60,6 +69,10 @@ def compute_losses(
     tag_loss_weight: float,
     lemma_loss_weight: float,
     label_smoothing: float = 0.0,
+    teacher_tag_ids: torch.Tensor | None = None,
+    teacher_lemma_char_ids: torch.Tensor | None = None,
+    kd_tag_weight: float = 0.0,
+    kd_lemma_weight: float = 0.0,
 ) -> torch.Tensor:
     # Tag loss
     if label_smoothing > 0:
@@ -75,7 +88,22 @@ def compute_losses(
     b, t, lemma_len, num_chars = lemma_logits.shape
     lemma_loss = lemma_loss_fn(lemma_logits.view(b * t * lemma_len, num_chars), lemma_char_ids.view(b * t * lemma_len))
 
-    return tag_loss_weight * tag_loss + lemma_loss_weight * lemma_loss
+    total = tag_loss_weight * tag_loss + lemma_loss_weight * lemma_loss
+    # Optional KD with hard teacher targets
+    if teacher_tag_ids is not None and kd_tag_weight > 0:
+        kd_mask = (teacher_tag_ids != -100) & token_mask
+        if kd_mask.any():
+            b, t, k = tag_logits.shape
+            kd_loss = tag_loss_fn(tag_logits.view(b * t, k), teacher_tag_ids.view(b * t))
+            total = total + kd_tag_weight * kd_loss
+    if teacher_lemma_char_ids is not None and kd_lemma_weight > 0:
+        b, t, l, c = lemma_logits.shape
+        kd_lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0)
+        kd_le_loss = kd_lemma_loss_fn(
+            lemma_logits.view(b * t * l, c), teacher_lemma_char_ids.view(b * t * l)
+        )
+        total = total + kd_lemma_weight * kd_le_loss
+    return total
 
 
 def train_one_epoch(
@@ -84,20 +112,42 @@ def train_one_epoch(
     optimizer: Optimizer,
     cfg: TrainConfig,
     device: torch.device,
+    scheduler: OneCycleLR | None = None,
 ) -> float:
     model.train()
     total_loss = 0.0
     steps = 0
     for batch in loader:
-        word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch]
+        # Support optional teacher tensors at the end of batch
+        if len(batch) >= 7:
+            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask, teacher_tag_ids, teacher_lemma_char_ids = [
+                x.to(device) for x in batch
+            ]
+        else:
+            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch]
+            teacher_tag_ids = None
+            teacher_lemma_char_ids = None
         optimizer.zero_grad(set_to_none=True)
         tag_logits, lemma_logits = model(word_ids, char_ids, lemma_char_ids)
         loss = compute_losses(
-            tag_logits, lemma_logits, tag_ids, lemma_char_ids, token_mask, cfg.tag_loss_weight, cfg.lemma_loss_weight
+            tag_logits,
+            lemma_logits,
+            tag_ids,
+            lemma_char_ids,
+            token_mask,
+            cfg.tag_loss_weight,
+            cfg.lemma_loss_weight,
+            cfg.label_smoothing,
+            teacher_tag_ids,
+            teacher_lemma_char_ids,
+            cfg.kd_tag_weight,
+            cfg.kd_lemma_weight,
         )
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         optimizer.step()
+        if scheduler is not None:
+            scheduler.step()
         total_loss += float(loss.item())
         steps += 1
     return total_loss / max(steps, 1)
@@ -111,7 +161,8 @@ def evaluate(model: GaelicMorphModel, loader: DataLoader, device: torch.device) 
     total_lemmas = 0
     with torch.no_grad():
         for batch in loader:
-            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch]
+            # Handle possible teacher tensors appended; ignore them here
+            word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch[:5]]
             tag_logits, lemma_logits = model(word_ids, char_ids, lemma_char_ids)
             # Tag accuracy
             preds = tag_logits.argmax(-1)
@@ -137,8 +188,11 @@ def run_training(cfg: TrainConfig) -> None:
     train_path = processed / "train.jsonl"
     dev_path = processed / "dev.jsonl"
 
-    train_ds = JSONLSentenceDataset(train_path, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
-    dev_ds = JSONLSentenceDataset(dev_path, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
+    # If KD is enabled and teacher files exist, use them
+    train_json = train_path.with_suffix(".teacher.jsonl") if cfg.use_kd and train_path.with_suffix(".teacher.jsonl").exists() else train_path
+    dev_json = dev_path.with_suffix(".teacher.jsonl") if cfg.use_kd and dev_path.with_suffix(".teacher.jsonl").exists() else dev_path
+    train_ds = JSONLSentenceDataset(train_json, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
+    dev_ds = JSONLSentenceDataset(dev_json, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
 
     # Optional subset for fast pilot runs
     if cfg.subset_frac < 1.0:
@@ -161,6 +215,10 @@ def run_training(cfg: TrainConfig) -> None:
         char_vocab_size=len(char2id),
         tagset_size=len(tag2id),
         lemma_max_len=cfg.max_lemma,
+        word_emb_dim=cfg.word_emb_dim,
+        char_emb_dim=cfg.char_emb_dim,
+        char_cnn_out=cfg.char_cnn_out,
+        encoder_hidden=cfg.encoder_hidden,
     ).to(device)
     if cfg.freeze_embeddings:
         for p in model.word_embedding.parameters():
@@ -173,7 +231,11 @@ def run_training(cfg: TrainConfig) -> None:
         optimizer = SGD(model.parameters(), lr=cfg.lr, momentum=0.9)
     else:
         optimizer = AdamW(model.parameters(), lr=cfg.lr)
-    scheduler = OneCycleLR(optimizer, max_lr=cfg.max_lr, epochs=cfg.epochs, steps_per_epoch=max(1, len(train_loader)))
+    scheduler = (
+        OneCycleLR(optimizer, max_lr=cfg.max_lr, epochs=cfg.epochs, steps_per_epoch=max(1, len(train_loader)))
+        if cfg.use_onecycle
+        else None
+    )
 
     # Optional resume
     start_epoch = 1
@@ -183,17 +245,17 @@ def run_training(cfg: TrainConfig) -> None:
     ckpt_dir.mkdir(parents=True, exist_ok=True)
     if cfg.resume_path and Path(cfg.resume_path).exists():
         state = torch.load(cfg.resume_path, map_location=device)
-        model.load_state_dict(state["model"])  # type: ignore[index]
-        optimizer.load_state_dict(state["optimizer"])  # type: ignore[index]
-        scheduler.load_state_dict(state.get("scheduler", {}))  # type: ignore[arg-type]
+        # Warm start: load only model weights to avoid optimizer/scheduler incompatibilities
+        model_state = state.get("model", state)
+        model.load_state_dict(model_state)
         start_epoch = int(state.get("epoch", 0)) + 1
         best_metric = float(state.get("best_metric", -1.0))
 
     for epoch in range(start_epoch, cfg.epochs + 1):
-        loss = train_one_epoch(model, train_loader, optimizer, cfg, device)
+        loss = train_one_epoch(model, train_loader, optimizer, cfg, device, scheduler)
         metrics = evaluate(model, dev_loader, device)
         print(f"epoch {epoch}: loss={loss:.4f} tag_acc={metrics['tag_acc']:.3f} lemma_acc={metrics['lemma_acc']:.3f}")
-        scheduler.step()
+        # epoch-level scheduler step not needed for OneCycle (stepped per batch)
 
         # Early stopping on combined metric prioritizing lemma
         combined = 0.6 * metrics["lemma_acc"] + 0.4 * metrics["tag_acc"]
@@ -206,7 +268,7 @@ def run_training(cfg: TrainConfig) -> None:
                     "epoch": epoch,
                     "model": model.state_dict(),
                     "optimizer": optimizer.state_dict(),
-                    "scheduler": scheduler.state_dict(),
+                    "scheduler": (scheduler.state_dict() if scheduler is not None else {}),
                     "best_metric": best_metric,
                 }, ckpt_dir / "best.pt")
         else:
@@ -221,7 +283,7 @@ def run_training(cfg: TrainConfig) -> None:
             "epoch": epoch,
             "model": model.state_dict(),
             "optimizer": optimizer.state_dict(),
-            "scheduler": scheduler.state_dict(),
+            "scheduler": (scheduler.state_dict() if scheduler is not None else {}),
             "best_metric": best_metric,
         }, ckpt_dir / "last.pt")
 

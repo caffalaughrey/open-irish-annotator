@@ -23,6 +23,8 @@ class EncodedSample:
     char_ids: torch.Tensor  # [T, C]
     tag_ids: torch.Tensor  # [T]
     lemma_char_ids: torch.Tensor  # [T, L]
+    teacher_tag_ids: torch.Tensor | None = None  # [T] or None
+    teacher_lemma_char_ids: torch.Tensor | None = None  # [T, L] or None
 
 
 def encode_sentence(
@@ -34,12 +36,16 @@ def encode_sentence(
     tag2id: Dict[str, int],
     max_chars: int = 24,
     max_lemma: int = 24,
+    teacher_tags: List[str] | None = None,
+    teacher_lemmas: List[str] | None = None,
 ) -> EncodedSample:
     word_ids = [word2id.get(w, UNK_WORD_ID) for w in tokens]
     tag_ids = [tag2id[tag] for tag in tag_strings]
     # chars per token
     char_rows: List[List[int]] = []
     lemma_rows: List[List[int]] = []
+    teacher_tag_ids: List[int] | None = [] if teacher_tags is not None else None
+    teacher_lemma_rows: List[List[int]] | None = [] if teacher_lemmas is not None else None
     for w, lemma in zip(tokens, lemmas):
         ch_ids = [char2id.get(c, UNK_CHAR_ID) for c in w][: max_chars - 1]
         ch_ids = ch_ids + [PAD_CHAR_ID] * (max_chars - len(ch_ids))
@@ -50,12 +56,24 @@ def encode_sentence(
         le_ids = le_ids + [EOS_CHAR_ID]
         le_ids = le_ids + [PAD_CHAR_ID] * (max_lemma - len(le_ids))
         lemma_rows.append(le_ids)
+    if teacher_tags is not None:
+        assert len(teacher_tags) == len(tokens)
+        teacher_tag_ids = [tag2id.get(tag, -100) for tag in teacher_tags]
+    if teacher_lemmas is not None:
+        assert len(teacher_lemmas) == len(tokens)
+        for tlemma in teacher_lemmas:
+            le_ids = [char2id.get(c, UNK_CHAR_ID) for c in tlemma][: max_lemma - 1]
+            le_ids = le_ids + [EOS_CHAR_ID]
+            le_ids = le_ids + [PAD_CHAR_ID] * (max_lemma - len(le_ids))
+            teacher_lemma_rows.append(le_ids)  # type: ignore[union-attr]
 
     return EncodedSample(
         word_ids=torch.tensor(word_ids, dtype=torch.long),
         char_ids=torch.tensor(char_rows, dtype=torch.long),
         tag_ids=torch.tensor(tag_ids, dtype=torch.long),
         lemma_char_ids=torch.tensor(lemma_rows, dtype=torch.long),
+        teacher_tag_ids=(torch.tensor(teacher_tag_ids, dtype=torch.long) if teacher_tag_ids is not None else None),
+        teacher_lemma_char_ids=(torch.tensor(teacher_lemma_rows, dtype=torch.long) if teacher_lemma_rows is not None else None),
     )
 
 
@@ -82,6 +100,8 @@ class JSONLSentenceDataset(Dataset[EncodedSample]):
                     tag2id,
                     max_chars,
                     max_lemma,
+                    obj.get("teacher_tags"),
+                    obj.get("teacher_lemmas"),
                 )
                 self.samples.append(enc)
 
@@ -103,6 +123,8 @@ def collate_batch(batch: List[EncodedSample]) -> Tuple[torch.Tensor, ...]:
     tag_ids = torch.full((bsz, max_t), -100, dtype=torch.long)  # ignore_index for CE
     char_ids = torch.full((bsz, max_t, char_len), PAD_CHAR_ID, dtype=torch.long)
     lemma_char_ids = torch.full((bsz, max_t, lemma_len), PAD_CHAR_ID, dtype=torch.long)
+    teacher_tag_ids = torch.full((bsz, max_t), -100, dtype=torch.long)
+    teacher_lemma_char_ids = torch.full((bsz, max_t, lemma_len), PAD_CHAR_ID, dtype=torch.long)
     token_mask = torch.zeros((bsz, max_t), dtype=torch.bool)
 
     for i, s in enumerate(batch):
@@ -111,9 +133,13 @@ def collate_batch(batch: List[EncodedSample]) -> Tuple[torch.Tensor, ...]:
         tag_ids[i, :t] = s.tag_ids
         char_ids[i, :t] = s.char_ids
         lemma_char_ids[i, :t] = s.lemma_char_ids
+        if s.teacher_tag_ids is not None:
+            teacher_tag_ids[i, :t] = s.teacher_tag_ids
+        if s.teacher_lemma_char_ids is not None:
+            teacher_lemma_char_ids[i, :t] = s.teacher_lemma_char_ids
         token_mask[i, :t] = 1
 
-    return word_ids, char_ids, tag_ids, lemma_char_ids, token_mask
+    return word_ids, char_ids, tag_ids, lemma_char_ids, token_mask, teacher_tag_ids, teacher_lemma_char_ids
 
 
 def make_loader(
@@ -131,13 +157,13 @@ def make_length_bucketed_loader(
     shuffle: bool = True,
 ) -> DataLoader:
     # Simple length bucketing: sort indices by sentence length and batch contiguously
-    lengths = [int(s.word_ids.shape[0]) for s in dataset.samples]
+    lengths = [int(dataset[i].word_ids.shape[0]) for i in range(len(dataset))]
     sorted_indices = sorted(range(len(lengths)), key=lambda i: lengths[i])
     batches: List[List[int]] = []
     for i in range(0, len(sorted_indices), batch_size):
         batches.append(sorted_indices[i : i + batch_size])
 
-    class _BucketSampler(torch.utils.data.Sampler[List[int]]):
+    class _BucketSampler(torch.utils.data.Sampler[int]):
         def __init__(self, batches: List[List[int]], shuffle: bool) -> None:
             self.batches = batches
             self.shuffle = shuffle
@@ -151,6 +177,7 @@ def make_length_bucketed_loader(
         def __len__(self) -> int:
             return sum(len(b) for b in self.batches)
 
-    return DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_batch, num_workers=2, pin_memory=False)
+    sampler = _BucketSampler(batches, shuffle)
+    return DataLoader(dataset, batch_size=batch_size, sampler=sampler, shuffle=False, collate_fn=collate_batch, num_workers=2, pin_memory=False)
 
 

@@ -41,9 +41,13 @@ class BiLSTMEncoder(nn.Module):
         if lengths is not None:
             # Ensure CPU tensor for packing meta, keep batch_first
             lengths_cpu = lengths.to("cpu")
-            packed = pack_padded_sequence(x, lengths_cpu, batch_first=True, enforce_sorted=False)
-            packed_out, _ = self.lstm(packed)
-            out, _ = pad_packed_sequence(packed_out, batch_first=True)
+            # If any length <= 0 (can occur with dummy export inputs), skip packing
+            if (lengths_cpu <= 0).any():
+                out, _ = self.lstm(x)
+            else:
+                packed = pack_padded_sequence(x, lengths_cpu, batch_first=True, enforce_sorted=False)
+                packed_out, _ = self.lstm(packed)
+                out, _ = pad_packed_sequence(packed_out, batch_first=True)
         else:
             out, _ = self.lstm(x)
         return out  # [batch, tokens, hidden_dim]

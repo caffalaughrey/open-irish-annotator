@@ -41,6 +41,9 @@ export:
 parity:
 	$(PY) scripts/onnx_parity.py
 
+teacher:
+	$(PY) scripts/build_teacher_stanza.py
+
 fmt:
 	ruff check --select I --fix . || true
 	black . || true
