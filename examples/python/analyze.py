@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--model", default="artifacts/onnx/model.onnx")
     ap.add_argument(
         "--resources",
-        default="rust/morphology_runtime/resources",
+        default="data/processed",
         help="directory with tagset/word_vocab/char_vocab",
     )
     ap.add_argument("--prefer-lexicon", action="store_true", help="prefer lemma_lexicon.json if present")
@@ -60,6 +60,11 @@ def main():
     # Convert lemma char IDs to strings until EOS=1
     id2ch = [ch for ch, _ in sorted(char2id.items(), key=lambda kv: kv[1])]
     results = []
+    # Allow environment default for prefer-lexicon
+    import os
+    prefer_env = os.environ.get("PREFER_LEXICON", "0") in ("1", "true", "TRUE", "yes", "YES")
+    prefer = args.prefer_lexicon or prefer_env
+
     for i, tok in enumerate(args.tokens):
         tag = tag_id2str[tag_ids[i]]
         lemma_chars = []
@@ -68,7 +73,7 @@ def main():
                 break
             lemma_chars.append(id2ch[cid] if cid < len(id2ch) else "?")
         decoded = "".join(lemma_chars) or tok
-        lemma = lemma_lex.get(tok, decoded) if args.prefer_lexicon else (decoded or lemma_lex.get(tok, decoded))
+        lemma = lemma_lex.get(tok, decoded) if prefer else (decoded or lemma_lex.get(tok, decoded))
         results.append((tok, tag, lemma))
 
     for tok, tag, lemma in results:

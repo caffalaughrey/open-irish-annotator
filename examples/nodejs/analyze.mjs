@@ -22,7 +22,7 @@ function encode(tokens, word2id, char2id, maxChars=24) {
 async function main() {
   const argv = process.argv.slice(2);
   let modelPath = 'artifacts/onnx/model.onnx';
-  let resDir = 'rust/morphology_runtime/resources';
+  let resDir = 'data/processed';
   let preferLex = false;
   const args = [];
   for (let i = 0; i < argv.length; i++) {
@@ -36,8 +36,7 @@ async function main() {
     process.exit(1);
   }
   if (!fs.existsSync(path.join(resDir, 'tagset.json'))) {
-    // try project-root relative from examples/
-    const alt = path.join(process.cwd(), '../../rust/morphology_runtime/resources');
+    const alt = path.join(process.cwd(), '../../data/processed');
     if (fs.existsSync(path.join(alt, 'tagset.json'))) resDir = alt;
   }
   const tag2id = loadJson(path.join(resDir, 'tagset.json'));
@@ -87,6 +86,7 @@ async function main() {
   // Find C by using maxChars assumption used in export (lemma_len=24 default). We'll infer L and C by searching a factor near 24.
   let L = 24; let C = Math.floor(LxC / L);
   const lemmaIdx = new Array(t);
+  const preferLex = preferLex || process.env.PREFER_LEXICON === '1' || process.env.PREFER_LEXICON === 'true';
   for (let i = 0; i < t; i++) {
     const slice = lemmaLogits.subarray(i*L*C, (i+1)*L*C);
     lemmaIdx[i] = argmaxRow(slice, C);
