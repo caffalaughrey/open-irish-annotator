@@ -14,6 +14,7 @@ UNK_WORD_ID = 1
 PAD_CHAR_ID = 0
 EOS_CHAR_ID = 1
 UNK_CHAR_ID = 2
+BOS_CHAR_ID = 3
 
 
 @dataclass
@@ -44,8 +45,8 @@ def encode_sentence(
         ch_ids = ch_ids + [PAD_CHAR_ID] * (max_chars - len(ch_ids))
         char_rows.append(ch_ids)
 
-        le_ids = [char2id.get(c, UNK_CHAR_ID) for c in lemma][: max_lemma - 1]
-        le_ids = le_ids + [EOS_CHAR_ID]
+        le_ids = [char2id.get(c, UNK_CHAR_ID) for c in lemma][: max_lemma - 2]
+        le_ids = [BOS_CHAR_ID] + le_ids + [EOS_CHAR_ID]
         le_ids = le_ids + [PAD_CHAR_ID] * (max_lemma - len(le_ids))
         lemma_rows.append(le_ids)
 

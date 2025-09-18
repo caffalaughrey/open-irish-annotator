@@ -50,7 +50,7 @@ def build_tagset(sentences: Iterable[Sentence]) -> Dict[str, int]:
 
 def build_vocabs(sentences: Iterable[Sentence]):
     word2id: Dict[str, int] = {"<pad>": 0, "<unk>": 1}
-    char2id: Dict[str, int] = {"<pad>": 0, "<eos>": 1, "<unk>": 2}
+    char2id: Dict[str, int] = {"<pad>": 0, "<eos>": 1, "<unk>": 2, "<bos>": 3}
     for s in sentences:
         for w in s.tokens:
             if w not in word2id:

@@ -68,7 +68,7 @@ def train_one_epoch(
     for batch in loader:
         word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch]
         optimizer.zero_grad(set_to_none=True)
-        tag_logits, lemma_logits = model(word_ids, char_ids)
+        tag_logits, lemma_logits = model(word_ids, char_ids, lemma_char_ids)
         loss = compute_losses(
             tag_logits, lemma_logits, tag_ids, lemma_char_ids, token_mask, cfg.tag_loss_weight, cfg.lemma_loss_weight
         )
@@ -89,7 +89,7 @@ def evaluate(model: GaelicMorphModel, loader: DataLoader, device: torch.device) 
     with torch.no_grad():
         for batch in loader:
             word_ids, char_ids, tag_ids, lemma_char_ids, token_mask = [x.to(device) for x in batch]
-            tag_logits, lemma_logits = model(word_ids, char_ids)
+            tag_logits, lemma_logits = model(word_ids, char_ids, lemma_char_ids)
             # Tag accuracy
             preds = tag_logits.argmax(-1)
             mask = token_mask
