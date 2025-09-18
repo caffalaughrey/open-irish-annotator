@@ -7,23 +7,41 @@ from typing import Dict
 
 import torch
 from torch import nn
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD, Optimizer
+from torch.optim.lr_scheduler import OneCycleLR
 from torch.utils.data import DataLoader
+from torch.utils.data import Subset
 
 from gaeilge_morph.models.model import GaelicMorphModel
-from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader
+from gaeilge_morph.data.dataset import (
+    JSONLSentenceDataset,
+    make_loader,
+    make_length_bucketed_loader,
+    PAD_CHAR_ID,
+)
 
 
 @dataclass
 class TrainConfig:
     batch_size: int = 16
     lr: float = 2e-3
+    max_lr: float = 1e-2
     epochs: int = 5
     device: str = "cpu"
     max_chars: int = 24
     max_lemma: int = 24
     tag_loss_weight: float = 1.0
     lemma_loss_weight: float = 0.5
+    label_smoothing: float = 0.0
+    optimizer: str = "adamw"  # or "sgd"
+    batch_workers: int = 2
+    subset_frac: float = 1.0
+    early_stop_patience: int = 3
+    save_best_only: bool = True
+    resume_path: str | None = None
+    freeze_encoder: bool = False
+    freeze_embeddings: bool = False
+    bucket_by_len: bool = False
 
 
 def load_resources(processed: Path):
@@ -41,15 +59,20 @@ def compute_losses(
     token_mask: torch.Tensor,
     tag_loss_weight: float,
     lemma_loss_weight: float,
+    label_smoothing: float = 0.0,
 ) -> torch.Tensor:
     # Tag loss
-    tag_loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+    if label_smoothing > 0:
+        tag_loss_fn = nn.CrossEntropyLoss(ignore_index=-100, label_smoothing=label_smoothing)
+        lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0, label_smoothing=label_smoothing)
+    else:
+        tag_loss_fn = nn.CrossEntropyLoss(ignore_index=-100)
+        lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0)
     b, t, k = tag_logits.shape
     tag_loss = tag_loss_fn(tag_logits.view(b * t, k), tag_ids.view(b * t))
 
     # Lemma loss: only over non-pad time steps; EOS marks end, but we train full length
     b, t, lemma_len, num_chars = lemma_logits.shape
-    lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0)  # PAD_CHAR_ID == 0
     lemma_loss = lemma_loss_fn(lemma_logits.view(b * t * lemma_len, num_chars), lemma_char_ids.view(b * t * lemma_len))
 
     return tag_loss_weight * tag_loss + lemma_loss_weight * lemma_loss
@@ -58,7 +81,7 @@ def compute_losses(
 def train_one_epoch(
     model: GaelicMorphModel,
     loader: DataLoader,
-    optimizer: AdamW,
+    optimizer: Optimizer,
     cfg: TrainConfig,
     device: torch.device,
 ) -> float:
@@ -95,9 +118,12 @@ def evaluate(model: GaelicMorphModel, loader: DataLoader, device: torch.device) 
             mask = token_mask
             correct_tags += int(((preds == tag_ids) & mask).sum().item())
             total_tags += int(mask.sum().item())
-            # Lemma accuracy (exact match per token)
+            # Lemma accuracy (exact match per token) ignoring PAD positions
             pred_lemma_ids = lemma_logits.argmax(-1)
-            correct_lemmas += int(((pred_lemma_ids == lemma_char_ids).all(-1) & mask).sum().item())
+            valid_pos = lemma_char_ids != PAD_CHAR_ID
+            pos_equal = (pred_lemma_ids == lemma_char_ids) | (~valid_pos)
+            exact_match = pos_equal.all(-1) & mask
+            correct_lemmas += int(exact_match.sum().item())
             total_lemmas += int(mask.sum().item())
     return {
         "tag_acc": correct_tags / max(total_tags, 1),
@@ -113,8 +139,21 @@ def run_training(cfg: TrainConfig) -> None:
 
     train_ds = JSONLSentenceDataset(train_path, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
     dev_ds = JSONLSentenceDataset(dev_path, word2id, char2id, tag2id, cfg.max_chars, cfg.max_lemma)
-    train_loader = make_loader(train_ds, batch_size=cfg.batch_size, shuffle=True)
-    dev_loader = make_loader(dev_ds, batch_size=cfg.batch_size, shuffle=False)
+
+    # Optional subset for fast pilot runs
+    if cfg.subset_frac < 1.0:
+        import math, random
+        n = len(train_ds)
+        k = max(1, int(math.ceil(n * cfg.subset_frac)))
+        idx = list(range(n))
+        random.shuffle(idx)
+        train_ds = Subset(train_ds, idx[:k])
+    if cfg.bucket_by_len:
+        train_loader = make_length_bucketed_loader(train_ds, batch_size=cfg.batch_size, buckets=10, shuffle=True)
+        dev_loader = make_length_bucketed_loader(dev_ds, batch_size=cfg.batch_size, buckets=10, shuffle=False)
+    else:
+        train_loader = make_loader(train_ds, batch_size=cfg.batch_size, shuffle=True)
+        dev_loader = make_loader(dev_ds, batch_size=cfg.batch_size, shuffle=False)
 
     device = torch.device(cfg.device)
     model = GaelicMorphModel(
@@ -123,16 +162,67 @@ def run_training(cfg: TrainConfig) -> None:
         tagset_size=len(tag2id),
         lemma_max_len=cfg.max_lemma,
     ).to(device)
-    optimizer = AdamW(model.parameters(), lr=cfg.lr)
+    if cfg.freeze_embeddings:
+        for p in model.word_embedding.parameters():
+            p.requires_grad = False
+    if cfg.freeze_encoder:
+        for p in model.encoder.parameters():
+            p.requires_grad = False
 
-    for epoch in range(1, cfg.epochs + 1):
+    if cfg.optimizer == "sgd":
+        optimizer = SGD(model.parameters(), lr=cfg.lr, momentum=0.9)
+    else:
+        optimizer = AdamW(model.parameters(), lr=cfg.lr)
+    scheduler = OneCycleLR(optimizer, max_lr=cfg.max_lr, epochs=cfg.epochs, steps_per_epoch=max(1, len(train_loader)))
+
+    # Optional resume
+    start_epoch = 1
+    best_metric = -1.0
+    no_improve = 0
+    ckpt_dir = Path("artifacts/checkpoints")
+    ckpt_dir.mkdir(parents=True, exist_ok=True)
+    if cfg.resume_path and Path(cfg.resume_path).exists():
+        state = torch.load(cfg.resume_path, map_location=device)
+        model.load_state_dict(state["model"])  # type: ignore[index]
+        optimizer.load_state_dict(state["optimizer"])  # type: ignore[index]
+        scheduler.load_state_dict(state.get("scheduler", {}))  # type: ignore[arg-type]
+        start_epoch = int(state.get("epoch", 0)) + 1
+        best_metric = float(state.get("best_metric", -1.0))
+
+    for epoch in range(start_epoch, cfg.epochs + 1):
         loss = train_one_epoch(model, train_loader, optimizer, cfg, device)
         metrics = evaluate(model, dev_loader, device)
         print(f"epoch {epoch}: loss={loss:.4f} tag_acc={metrics['tag_acc']:.3f} lemma_acc={metrics['lemma_acc']:.3f}")
+        scheduler.step()
 
-    # Save checkpoint minimally
-    ckpt_dir = Path("artifacts/checkpoints")
-    ckpt_dir.mkdir(parents=True, exist_ok=True)
+        # Early stopping on combined metric prioritizing lemma
+        combined = 0.6 * metrics["lemma_acc"] + 0.4 * metrics["tag_acc"]
+        improved = combined > best_metric
+        if improved:
+            best_metric = combined
+            no_improve = 0
+            if cfg.save_best_only:
+                torch.save({
+                    "epoch": epoch,
+                    "model": model.state_dict(),
+                    "optimizer": optimizer.state_dict(),
+                    "scheduler": scheduler.state_dict(),
+                    "best_metric": best_metric,
+                }, ckpt_dir / "best.pt")
+        else:
+            no_improve += 1
+            if no_improve >= cfg.early_stop_patience:
+                break
+
+    # Save final (and best if not saved-only)
     torch.save(model.state_dict(), ckpt_dir / "model.pt")
+    if not cfg.save_best_only:
+        torch.save({
+            "epoch": epoch,
+            "model": model.state_dict(),
+            "optimizer": optimizer.state_dict(),
+            "scheduler": scheduler.state_dict(),
+            "best_metric": best_metric,
+        }, ckpt_dir / "last.pt")
 
 

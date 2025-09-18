@@ -26,6 +26,11 @@ build-tagset:
 
 train:
 	$(PY) -m gaeilge_morph.training.train || echo "Training stub not implemented yet"
+pilot:
+	$(PY) -m gaeilge_morph.training.train --epochs 5 --batch-size 64 --lr 0.002 --device cpu --max-chars 32 --max-lemma 32 --tag-loss-weight 1.0 --lemma-loss-weight 1.0 || true
+
+resume:
+	$(PY) -m gaeilge_morph.training.train --epochs 20 --batch-size 64 --lr 0.002 --device cpu --resume-path artifacts/checkpoints/best.pt || true
 
 eval:
 	$(PY) -m gaeilge_morph.eval.evaluate || echo "Eval stub not implemented yet"

@@ -5,7 +5,7 @@ import json
 import torch
 
 from gaeilge_morph.models.model import GaelicMorphModel
-from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader
+from gaeilge_morph.data.dataset import JSONLSentenceDataset, make_loader, PAD_CHAR_ID
 
 
 def main() -> None:
@@ -36,9 +36,12 @@ def main() -> None:
             mask = token_mask
             correct_tags += int(((preds == tag_ids) & mask).sum().item())
             total_tags += int(mask.sum().item())
-            # Lemma exact-match per token
+            # Lemma exact-match per token ignoring PAD positions
             pred_lemma_ids = lemma_logits.argmax(-1)
-            correct_lemmas += int(((pred_lemma_ids == lemma_char_ids).all(-1) & mask).sum().item())
+            valid_pos = lemma_char_ids != PAD_CHAR_ID
+            pos_equal = (pred_lemma_ids == lemma_char_ids) | (~valid_pos)
+            exact_match = pos_equal.all(-1) & mask
+            correct_lemmas += int(exact_match.sum().item())
             total_lemmas += int(mask.sum().item())
 
     tag_acc = correct_tags / max(total_tags, 1)

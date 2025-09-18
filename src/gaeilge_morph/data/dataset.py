@@ -45,8 +45,9 @@ def encode_sentence(
         ch_ids = ch_ids + [PAD_CHAR_ID] * (max_chars - len(ch_ids))
         char_rows.append(ch_ids)
 
-        le_ids = [char2id.get(c, UNK_CHAR_ID) for c in lemma][: max_lemma - 2]
-        le_ids = [BOS_CHAR_ID] + le_ids + [EOS_CHAR_ID]
+        # Targets do NOT include BOS; only true lemma chars followed by EOS
+        le_ids = [char2id.get(c, UNK_CHAR_ID) for c in lemma][: max_lemma - 1]
+        le_ids = le_ids + [EOS_CHAR_ID]
         le_ids = le_ids + [PAD_CHAR_ID] * (max_lemma - len(le_ids))
         lemma_rows.append(le_ids)
 
@@ -120,6 +121,36 @@ def make_loader(
     batch_size: int = 16,
     shuffle: bool = True,
 ) -> DataLoader:
-    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch)
+    return DataLoader(dataset, batch_size=batch_size, shuffle=shuffle, collate_fn=collate_batch, num_workers=2, pin_memory=False)
+
+
+def make_length_bucketed_loader(
+    dataset: JSONLSentenceDataset,
+    batch_size: int = 16,
+    buckets: int = 10,
+    shuffle: bool = True,
+) -> DataLoader:
+    # Simple length bucketing: sort indices by sentence length and batch contiguously
+    lengths = [int(s.word_ids.shape[0]) for s in dataset.samples]
+    sorted_indices = sorted(range(len(lengths)), key=lambda i: lengths[i])
+    batches: List[List[int]] = []
+    for i in range(0, len(sorted_indices), batch_size):
+        batches.append(sorted_indices[i : i + batch_size])
+
+    class _BucketSampler(torch.utils.data.Sampler[List[int]]):
+        def __init__(self, batches: List[List[int]], shuffle: bool) -> None:
+            self.batches = batches
+            self.shuffle = shuffle
+        def __iter__(self):
+            order = list(range(len(self.batches)))
+            if self.shuffle:
+                import random
+                random.shuffle(order)
+            for bi in order:
+                yield from self.batches[bi]
+        def __len__(self) -> int:
+            return sum(len(b) for b in self.batches)
+
+    return DataLoader(dataset, batch_size=batch_size, shuffle=False, collate_fn=collate_batch, num_workers=2, pin_memory=False)
 
 

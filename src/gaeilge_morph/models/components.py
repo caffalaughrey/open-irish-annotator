@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import torch
 from torch import nn
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 
 
 class CharCNN(nn.Module):
@@ -35,9 +36,16 @@ class BiLSTMEncoder(nn.Module):
             bidirectional=True,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, lengths: torch.Tensor | None = None) -> torch.Tensor:
         # x: [batch, tokens, input_dim]
-        out, _ = self.lstm(x)
+        if lengths is not None:
+            # Ensure CPU tensor for packing meta, keep batch_first
+            lengths_cpu = lengths.to("cpu")
+            packed = pack_padded_sequence(x, lengths_cpu, batch_first=True, enforce_sorted=False)
+            packed_out, _ = self.lstm(packed)
+            out, _ = pad_packed_sequence(packed_out, batch_first=True)
+        else:
+            out, _ = self.lstm(x)
         return out  # [batch, tokens, hidden_dim]
 
 
