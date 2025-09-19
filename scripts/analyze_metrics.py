@@ -39,10 +39,14 @@ def length_buckets(rows: List[Dict]) -> Counter:
     buckets = Counter()
     for r in rows:
         n = len(r["tokens"])
-        if n <= 5: buckets['<=5'] += 1
-        elif n <= 10: buckets['6-10'] += 1
-        elif n <= 20: buckets['11-20'] += 1
-        else: buckets['>20'] += 1
+        if n <= 5:
+            buckets['<=5'] += 1
+        elif n <= 10:
+            buckets['6-10'] += 1
+        elif n <= 20:
+            buckets['11-20'] += 1
+        else:
+            buckets['>20'] += 1
     return buckets
 
 
