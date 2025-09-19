@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from collections import Counter, defaultdict
+from collections import Counter
 from typing import Dict, List, Tuple
 
 
