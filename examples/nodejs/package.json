@@ -1,0 +1,15 @@
+{
+  "name": "open-irish-annotator-nodejs",
+  "version": "1.0.0",
+  "description": "Nodejs runtime for the Open Irish Annotator",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "onnxruntime-node": "^1.22.0"
+  }
+}

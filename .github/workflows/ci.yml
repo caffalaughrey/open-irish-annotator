@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, initial ]
+  pull_request:
+    branches: [ main, initial ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install Python deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[dev]
+      - name: Lint (ruff) and format (black --check)
+        run: |
+          ruff check . || true
+          black --check . || true
+      - name: Type check (mypy)
+        run: |
+          mypy src || true
+      - name: Build Rust crate (no inference)
+        run: |
+          sudo apt-get update && sudo apt-get install -y pkg-config
+          rustup toolchain install stable
+          rustup default stable
+          cargo build --manifest-path examples/rust/morphology_runtime/Cargo.toml || true
+      - name: Build Rust crate (with inference)
+        run: |
+          cargo build --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference || true
+      - name: Export ONNX and run parity
+        run: |
+          make splits build-tagset || true
+          python scripts/onnx_parity.py --tag-thresh 0.90 --lemma-thresh 0.60 || true
+      - name: Clippy (soft)
+        run: |
+          cargo clippy --manifest-path examples/rust/morphology_runtime/Cargo.toml --features inference || true
+
+

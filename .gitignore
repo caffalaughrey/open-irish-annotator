@@ -1,0 +1,39 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+*.egg-info/
+
+# Data and artifacts (generated)
+data/raw/
+data/processed/
+data/cache/
+artifacts/
+
+# Notebooks
+*.ipynb_checkpoints/
+
+# Editors/IDE
+.vscode/
+.idea/
+
+# Rust
+target/
+
+# Logs
+*.log
+
+# Node (if any examples later)
+node_modules/
+
+# Cursor/Editor metadata
+.cursorrules
+.cursorignore
+RESEARCH.md
