@@ -97,10 +97,11 @@ def compute_losses(
             kd_loss = tag_loss_fn(tag_logits.view(b * t, k), teacher_tag_ids.view(b * t))
             total = total + kd_tag_weight * kd_loss
     if teacher_lemma_char_ids is not None and kd_lemma_weight > 0:
-        b, t, l, c = lemma_logits.shape
+        b, t, lemma_len_kd, num_chars_kd = lemma_logits.shape
         kd_lemma_loss_fn = nn.CrossEntropyLoss(ignore_index=0)
         kd_le_loss = kd_lemma_loss_fn(
-            lemma_logits.view(b * t * l, c), teacher_lemma_char_ids.view(b * t * l)
+            lemma_logits.view(b * t * lemma_len_kd, num_chars_kd),
+            teacher_lemma_char_ids.view(b * t * lemma_len_kd),
         )
         total = total + kd_lemma_weight * kd_le_loss
     return total
@@ -196,7 +197,8 @@ def run_training(cfg: TrainConfig) -> None:
 
     # Optional subset for fast pilot runs
     if cfg.subset_frac < 1.0:
-        import math, random
+        import math
+        import random
         n = len(train_ds)
         k = max(1, int(math.ceil(n * cfg.subset_frac)))
         idx = list(range(n))
